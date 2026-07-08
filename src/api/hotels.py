@@ -1,4 +1,11 @@
 from fastapi import Query, Body, APIRouter, HTTPException
+
+from fastapi.openapi.models import Example
+
+from sqlalchemy import insert
+
+from src.database import async_session_maker
+from src.models.hotels import HotelsORM
 from src.schemas.hotels import Hotel, HotelPATCH
 from src.api.dependencies import PaginationDep
 
@@ -17,12 +24,12 @@ hotels = [
 @router.get('')
 def get_hotels(
         pagination: PaginationDep,
-        id: int | None = Query(None, description='Номер отеля в базе'),
+        hotel_id: int | None = Query(None, description='Номер отеля в базе'),
         title: str | None = Query(None, description='Название отеля в базе')
 ):
     new_hotels = []
     for hotel in hotels:
-        if id and hotel['id'] != id:
+        if hotel_id and hotel['id'] != hotel_id:
             continue
         if title and hotel['title'] != title:
             continue
@@ -31,14 +38,21 @@ def get_hotels(
         return new_hotels[(pagination.page - 1) * pagination.per_page : (pagination.page - 1) * pagination.per_page + pagination.per_page]
     return new_hotels
 
-@router.post('')
-def create_hotel(hotel_data: Hotel):
-    global hotels
-    hotels.append({
-        'id' : hotels[-1]['id'] + 1,
-        'title' : hotel_data.title,
-        'name' : hotel_data.name
-    })
+@router.post("")
+async def create_hotel(hotel_data: Hotel = Body(openapi_examples={
+    "1" : Example(
+        summary="Сочи",
+        value={"title": "Сочи", "location": "Ул. Невского, 19А"}
+    ),
+    "2" : Example(
+        summary="Дубай",
+        value={"title": "Дубай", "location": "Ул. Мамадышская, 14"}
+    )
+})):
+    async with async_session_maker() as session:
+        add_hotel_stmt = insert(HotelsORM).values(**hotel_data.model_dump())
+        await session.execute(add_hotel_stmt)
+        await session.commit()
     return {'message' : 'OK'}
 
 @router.put('/{hotel_id}', summary='Полное обновление данных')
@@ -67,15 +81,15 @@ def one_update_hotel(
     global hotels
     for hotel in hotels:
         if hotel['id'] == hotel_id:
-            if hotel_data.title is None and hotel_data.name is None:
+            if hotel_data.title is None and hotel_data.location is None:
                 raise HTTPException(
                     status_code=400,
                     detail='Нельзя обновить отель, если не передано ни одного нового значения'
                 )
             if hotel_data.title is not None:
                 hotel['title'] = hotel_data.title
-            if hotel_data.name is not None:
-                hotel['name'] = hotel_data.name
+            if hotel_data.location is not None:
+                hotel['name'] = hotel_data.location
             return {'message': f'Данные отеля id - {hotel_id} изменены'}
     raise HTTPException(
         status_code=404,
