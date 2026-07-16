@@ -2,7 +2,6 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from src.api.hotels import router as router_hotels
-from src.database import *
 import sys
 
 sys.path.append(str(Path(__file__).parent.parent))

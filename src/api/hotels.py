@@ -4,6 +4,7 @@ from fastapi.openapi.models import Example
 
 from sqlalchemy import select, insert
 
+from src.repositories.hotels import HotelsRepository
 from src.database import async_session_maker, engine
 from src.models.hotels import HotelsORM
 from src.schemas.hotels import Hotel, HotelPATCH
@@ -17,21 +18,27 @@ async def get_hotels(
         title: str | None = Query(None, description="Название отеля в базе"),
         location: str | None = Query(None, description="Локация")
 ):
-    per_page = pagination.per_page or 5
-    async with async_session_maker() as session: 
-        query = select(HotelsORM)
-        if title:
-            query = query.where(HotelsORM.title.ilike(f"%{title}%"))
-        if location:
-            query = query.where(HotelsORM.location.ilike(f"%{location}%"))
-        query = (
-            query
-            .limit(per_page)
-            .offset(per_page * (pagination.page - 1))
-        )
-        result = await session.execute(query)
-        hotels = result.scalars().all()
-        return hotels
+    async with async_session_maker() as session:
+        return await HotelsRepository(session).get_all()
+    # per_page = pagination.per_page or 5
+    # async with async_session_maker() as session:
+    #     query = select(HotelsORM)
+    #     if title:
+    #         query = query.where(
+    #             HotelsORM.title.ilike(f"%{title}%")
+    #         )
+    #     if location:
+    #         query = query.where(
+    #             HotelsORM.location.ilike(f"%{location}%")
+    #         )
+    #     query = (
+    #         query
+    #         .limit(per_page)
+    #         .offset(per_page * (pagination.page - 1))
+    #     )
+    #     result = await session.execute(query)
+    #     hotels = result.scalars().all()
+    #     return hotels
     # if pagination.page and pagination.per_page:
     #     return new_hotels[(pagination.page - 1) * pagination.per_page : (pagination.page - 1) * pagination.per_page + pagination.per_page]
 
