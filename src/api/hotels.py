@@ -1,8 +1,8 @@
 from fastapi.exceptions import HTTPException
-from fastapi import Query, Body, APIRouter
+from fastapi import Query, APIRouter
 from src.repositories.hotels import HotelsRepository
 from src.database import async_session_maker
-from src.schemas.hotels import Hotel, HotelPATCH
+from src.schemas.hotels import HotelAdd, HotelPATCH
 from src.api.dependencies import PaginationDep
 
 router = APIRouter(prefix="/hotels", tags=["Отели"])
@@ -34,7 +34,7 @@ async def get_hotel(hotel_id: int):
     return hotel
 
 @router.post("")
-async def create_hotel(hotel_data: Hotel):
+async def create_hotel(hotel_data: HotelAdd):
     async with async_session_maker() as session:
         hotel = await HotelsRepository(session).add(hotel_data)
         await session.commit()
@@ -43,7 +43,7 @@ async def create_hotel(hotel_data: Hotel):
 @router.put("/{hotel_id}", summary="Полное обновление данных")
 async def full_update_hotel(
         hotel_id: int,
-        hotel_data: Hotel
+        hotel_data: HotelAdd
 ):
     async with async_session_maker() as session:
         hotel_repository = HotelsRepository(session)

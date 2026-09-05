@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 class HotelsRepository(BaseRepository):
     model = HotelsORM
+    schema = Hotel
 
     async def get_all(
             self,
@@ -30,4 +31,4 @@ class HotelsRepository(BaseRepository):
         print(query.compile(compile_kwargs={"literal_binds" : True}))
         result = await self.session.execute(query)
 
-        return result.scalars().all()
+        return [Hotel.model_validate(hotel, from_attributes=True) for hotel in result.scalars().all()]
