@@ -1,12 +1,7 @@
-from fastapi import Query, Body, APIRouter, HTTPException
-
-from fastapi.openapi.models import Example
-
-from sqlalchemy import select, insert
-
+from fastapi.exceptions import HTTPException
+from fastapi import Query, Body, APIRouter
 from src.repositories.hotels import HotelsRepository
-from src.database import async_session_maker, engine
-from src.models.hotels import HotelsORM
+from src.database import async_session_maker
 from src.schemas.hotels import Hotel, HotelPATCH
 from src.api.dependencies import PaginationDep
 
@@ -24,70 +19,59 @@ async def get_hotels(
             location,
             title,
             limit=per_page or 5,
-            offset=per_page * (pagination.page - 1)
+            offset=per_page * ((pagination.page or 1) - 1)
         )
 
 @router.post("")
-async def create_hotel(hotel_data: Hotel = Body(openapi_examples={
-    "1" : Example(
-        summary="Сочи",
-        value={"title": "Сочи", "location": "Ул. Невского, 19А"}
-    ),
-    "2" : Example(
-        summary="Дубай",
-        value={"title": "Дубай", "location": "Ул. Мамадышская, 14"}
-    )
-})):
+async def create_hotel(hotel_data: Hotel):
     async with async_session_maker() as session:
-        add_hotel_stmt = insert(HotelsORM).values(**hotel_data.model_dump())
-        print(add_hotel_stmt.compile(engine, compile_kwargs={"literal_binds" : True}))
-        await session.execute(add_hotel_stmt)
+        hotel = await HotelsRepository(session).add(hotel_data)
         await session.commit()
-    return {"message" : "OK"}
+    return {"status" : "Ok", "data": hotel}
 
 @router.put("/{hotel_id}", summary="Полное обновление данных")
-def full_update_hotel(
+async def full_update_hotel(
         hotel_id: int,
-        hotel_title: str = Body(),
-        hotel_name: str = Body(),
+        hotel_data: Hotel
 ):
-    global hotels
-    for hotel in hotels:
-        if hotel["id"] == hotel_id:
-            hotel["title"] = hotel_title
-            hotel["name"] = hotel_name
-            return {"message" : f"Данные отеля id - {hotel_id} изменены"}
-    raise HTTPException(
-        status_code=404,
-        detail=f"Отель с id {hotel_id} не найден"
-    )
-
+    async with async_session_maker() as session:
+        hotel_repository = HotelsRepository(session)
+        hotel = await hotel_repository.edit(hotel_data, id = hotel_id)
+        if hotel is None:
+            raise HTTPException(status_code=404, detail=f"Отель с id {hotel_id} не найден")
+        await session.commit()
+    return {"status" : "Ok", "data": hotel}
 
 @router.patch("/{hotel_id}", summary="Частичное обновление данных")
 def one_update_hotel(
         hotel_id: int,
         hotel_data: HotelPATCH
 ):
-    global hotels
-    for hotel in hotels:
-        if hotel["id"] == hotel_id:
-            if hotel_data.title is None and hotel_data.location is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Нельзя обновить отель, если не передано ни одного нового значения"
-                )
-            if hotel_data.title is not None:
-                hotel["title"] = hotel_data.title
-            if hotel_data.location is not None:
-                hotel["name"] = hotel_data.location
-            return {"message": f"Данные отеля id - {hotel_id} изменены"}
-    raise HTTPException(
-        status_code=404,
-        detail=f"Отель с id {hotel_id} не найден"
-    )
+    # global hotels
+    # for hotel in hotels:
+    #     if hotel["id"] == hotel_id:
+    #         if hotel_data.title is None and hotel_data.location is None:
+    #             raise HTTPException(
+    #                 status_code=400,
+    #                 detail="Нельзя обновить отель, если не передано ни одного нового значения"
+    #             )
+    #         if hotel_data.title is not None:
+    #             hotel["title"] = hotel_data.title
+    #         if hotel_data.location is not None:
+    #             hotel["name"] = hotel_data.location
+    #         return {"message": f"Данные отеля id - {hotel_id} изменены"}
+    # raise HTTPException(
+    #     status_code=404,
+    #     detail=f"Отель с id {hotel_id} не найден"
+    # )
+    pass
 
-@router.delete("/{hotel_id}")
-def delete_hotel(hotel_id: int):
-    global hotels
-    hotels = [hotel for hotel in hotels if hotel["id"] != hotel_id]
-    return {"status" : "OK"}
+@router.delete("/{hotel_id}", summary='Удаление данных отеля')
+async def delete_hotel(hotel_id: int):
+    async with async_session_maker() as session:
+        hotels_repository = HotelsRepository(session)
+        deleted_hotel = await hotels_repository.delete(id = hotel_id)
+        if deleted_hotel is None:
+            raise HTTPException(status_code=404, detail=f"Отель с id {hotel_id} не найден")
+        await session.commit()
+    return {"status" : "Ok", "data": deleted_hotel}

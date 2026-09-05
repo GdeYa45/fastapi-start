@@ -1,3 +1,4 @@
+from src.schemas.hotels import Hotel
 from src.models.hotels import HotelsORM
 from src.repositories.base import BaseRepository
 from sqlalchemy import select
