@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Response
+from starlette.requests import Request
 
 from src.services.auth import AuthService
 from src.repositories.users import UsersRepository
@@ -39,3 +40,11 @@ async def login_user(data: UserRequestAdd, response: Response):
         access_token = AuthService().create_access_token({"user_id": user.id})
         response.set_cookie("access_token", access_token)
         return {"access_token": access_token}
+
+@router.get("/only_auth")
+async def only_auth(request: Request):
+    token = request.cookies.get("access_token", None)
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Пользователь не подтверждён")
+    return {"message": "OK"}
